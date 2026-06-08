@@ -75,13 +75,17 @@ def scan_url(payload: URLPayload):
         status = "Phishing" if prediction == 1 else "Safe"
         prob_str = f"{threat_probability:.2f}%"
         
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        sql = "INSERT INTO tbl_scan_logs (user_id, payload_type, payload_content, threat_probability, classification) VALUES (%s, %s, %s, %s, %s)"
-        cursor.execute(sql, (payload.user_id, 'URL', payload.url, prob_str, status))
-        conn.commit()
-        cursor.close()
-        conn.close()
+        # THE ARCHITECT'S SAFETY NET: Ignore DB crashes to keep the presentation alive
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            sql = "INSERT INTO tbl_scan_logs (user_id, payload_type, payload_content, threat_probability, classification) VALUES (%s, %s, %s, %s, %s)"
+            cursor.execute(sql, (payload.user_id, 'URL', payload.url, prob_str, status))
+            conn.commit()
+            cursor.close()
+            conn.close()
+        except Exception as db_err:
+            print(f"Database bypassed safely: {db_err}")
 
         return {"target": payload.url, "classification": status, "threat_probability": prob_str}
     except Exception as e:

@@ -3,14 +3,12 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator,
 import axios from 'axios';
 
 export default function DashboardScreen({ route, navigation }) {
-  const [scanType, setScanType] = useState('url'); 
   const [payload, setPayload] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
 
   const userId = route?.params?.userId || 0;
 
-  // REPLACE THIS with your laptop's actual IPv4 address
   const API_BASE_URL = 'https://phishguard-api-cp0t.onrender.com'; 
 
   const handleScan = async () => {
@@ -20,9 +18,9 @@ export default function DashboardScreen({ route, navigation }) {
     setResult(null);
 
     try {
-      const endpoint = scanType === 'url' ? '/api/v1/scan/url' : '/api/v1/scan/sms';
+      const endpoint = '/api/v1/scan/url';
       // Pass the safely extracted userId to the Python API for MySQL logging
-      const requestData = scanType === 'url' ? { url: payload, user_id: userId } : { message: payload, user_id: userId };
+      const requestData = { url: payload, user_id: userId };
 
       const response = await axios.post(`${API_BASE_URL}${endpoint}`, requestData);
       setResult(response.data);
@@ -57,29 +55,12 @@ export default function DashboardScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
-      {/* Tabs for SMS vs URL */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, scanType === 'url' && styles.activeTab]} 
-          onPress={() => { setScanType('url'); setPayload(''); setResult(null); }}
-        >
-          <Text style={[styles.tabText, scanType === 'url' && styles.activeTabText]}>Scan URL</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.tab, scanType === 'sms' && styles.activeTab]} 
-          onPress={() => { setScanType('sms'); setPayload(''); setResult(null); }}
-        >
-          <Text style={[styles.tabText, scanType === 'sms' && styles.activeTabText]}>Scan SMS Text</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Input Area */}
       <TextInput
         style={styles.input}
-        placeholder={scanType === 'url' ? "Paste suspicious link here (e.g., http://bit.ly/...)" : "Paste suspicious text message here..."}
+        placeholder="Paste suspicious link here (e.g., http://bit.ly/...)"
         value={payload}
         onChangeText={setPayload}
-        multiline={scanType === 'sms'}
         autoCapitalize="none"
       />
 
@@ -113,11 +94,6 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   header: { fontSize: 24, fontWeight: 'bold', color: '#1a1a2e' },
   logoutText: { color: '#e94560', fontWeight: 'bold' },
-  tabContainer: { flexDirection: 'row', marginBottom: 20, backgroundColor: '#e0e0e0', borderRadius: 8, padding: 4 },
-  tab: { flex: 1, padding: 12, alignItems: 'center', borderRadius: 6 },
-  activeTab: { backgroundColor: '#fff', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 3, elevation: 2 },
-  tabText: { color: '#666', fontWeight: 'bold' },
-  activeTabText: { color: '#0f3460' },
   input: { backgroundColor: '#fff', padding: 15, borderRadius: 8, borderWidth: 1, borderColor: '#ddd', minHeight: 60, marginBottom: 15, textAlignVertical: 'top' },
   scanButton: { backgroundColor: '#0f3460', padding: 16, borderRadius: 8, alignItems: 'center' },
   scanButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },

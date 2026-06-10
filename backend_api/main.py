@@ -132,7 +132,6 @@ def scan_sms(payload: SMSPayload):
         return {"target": payload.message, "classification": status, "threat_probability": prob_str}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 # --- USER TELEMETRY & REPORTING ENDPOINTS ---
 
 @app.get("/api/v1/history/{user_id}")

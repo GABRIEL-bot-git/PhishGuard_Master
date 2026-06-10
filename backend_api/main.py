@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-app = FastAPI(title="PhishGuard AI API", version="2.0.0")
+app = FastAPI(title="PhishGuard AI API", version="2.1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -132,6 +132,7 @@ def scan_sms(payload: SMSPayload):
         return {"target": payload.message, "classification": status, "threat_probability": prob_str}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 # --- USER TELEMETRY & REPORTING ENDPOINTS ---
 
 @app.get("/api/v1/history/{user_id}")
@@ -139,10 +140,27 @@ def get_user_history(user_id: int):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT log_id, payload_type, payload_content, threat_probability, classification, is_reported, timestamp FROM tbl_scan_logs WHERE user_id = %s ORDER BY timestamp DESC", (user_id,))
+        # Using SELECT * prevents syntax crashes caused by unknown column names
+        cursor.execute("SELECT * FROM tbl_scan_logs WHERE user_id = %s", (user_id,))
         logs = cursor.fetchall()
-        return logs
+        
+        normalized_logs = []
+        for row in logs:
+            # Map column key aliases dynamically to fit what the mobile app requires
+            if 'log_id' not in row and 'id' in row:
+                row['log_id'] = row['id']
+            if 'is_reported' not in row:
+                row['is_reported'] = 0
+            normalized_logs.append(row)
+            
+        # Dynamically find date column and sort in Python memory
+        date_key = next((k for k in ['timestamp', 'created_at', 'date'] if k in row), None) if normalized_logs else None
+        if date_key:
+            normalized_logs.sort(key=lambda x: str(x[date_key]) if x[date_key] else '', reverse=True)
+            
+        return normalized_logs
     except Exception as e:
+        print(f"❌ Critical History Fetch Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if 'conn' in locals() and conn.is_connected():
@@ -154,7 +172,11 @@ def report_false_negative(log_id: int):
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute("UPDATE tbl_scan_logs SET is_reported = 1 WHERE log_id = %s", (log_id,))
+        # Fallback tracking update
+        try:
+            cursor.execute("UPDATE tbl_scan_logs SET is_reported = 1 WHERE log_id = %s", (log_id,))
+        except Exception:
+            cursor.execute("UPDATE tbl_scan_logs SET is_reported = 1 WHERE id = %s", (log_id,))
         conn.commit()
         return {"message": "Threat successfully reported to administration."}
     except Exception as e:
@@ -171,9 +193,8 @@ def admin_get_all_users():
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT user_id, full_name, email, created_at FROM tbl_users WHERE user_id != 1")
-        users = cursor.fetchall()
-        return users
+        cursor.execute("SELECT user_id, full_name, email FROM tbl_users WHERE user_id != 1")
+        return cursor.fetchall()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:
@@ -186,9 +207,15 @@ def admin_get_user_history(target_user_id: int):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        cursor.execute("SELECT log_id, payload_type, payload_content, threat_probability, classification, is_reported, timestamp FROM tbl_scan_logs WHERE user_id = %s ORDER BY timestamp DESC", (target_user_id,))
+        cursor.execute("SELECT * FROM tbl_scan_logs WHERE user_id = %s", (target_user_id,))
         logs = cursor.fetchall()
-        return logs
+        
+        normalized_logs = []
+        for row in logs:
+            if 'log_id' not in row and 'id' in row:
+                row['log_id'] = row['id']
+            normalized_logs.append(row)
+        return normalized_logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     finally:

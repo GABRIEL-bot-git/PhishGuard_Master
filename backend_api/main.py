@@ -140,23 +140,21 @@ def get_user_history(user_id: int):
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        # Using SELECT * prevents syntax crashes caused by unknown column names
         cursor.execute("SELECT * FROM tbl_scan_logs WHERE user_id = %s", (user_id,))
         logs = cursor.fetchall()
         
         normalized_logs = []
         for row in logs:
-            # Map column key aliases dynamically to fit what the mobile app requires
             if 'log_id' not in row and 'id' in row:
                 row['log_id'] = row['id']
             if 'is_reported' not in row:
                 row['is_reported'] = 0
             normalized_logs.append(row)
             
-        # Dynamically find date column and sort in Python memory
-        date_key = next((k for k in ['timestamp', 'created_at', 'date'] if k in row), None) if normalized_logs else None
-        if date_key:
-            normalized_logs.sort(key=lambda x: str(x[date_key]) if x[date_key] else '', reverse=True)
+        # FIXED: Sorts by primary numerical ID key in reverse order (Newest first)
+        id_key = next((k for k in ['log_id', 'id'] if k in row), None) if normalized_logs else None
+        if id_key:
+            normalized_logs.sort(key=lambda x: x[id_key], reverse=True)
             
         return normalized_logs
     except Exception as e:
@@ -166,6 +164,7 @@ def get_user_history(user_id: int):
         if 'conn' in locals() and conn.is_connected():
             cursor.close()
             conn.close()
+
 
 @app.post("/api/v1/report/{log_id}")
 def report_false_negative(log_id: int):
@@ -215,6 +214,12 @@ def admin_get_user_history(target_user_id: int):
             if 'log_id' not in row and 'id' in row:
                 row['log_id'] = row['id']
             normalized_logs.append(row)
+            
+        # FIXED: Sorts administrative logs by primary key in reverse order (Newest first)
+        id_key = next((k for k in ['log_id', 'id'] if k in row), None) if normalized_logs else None
+        if id_key:
+            normalized_logs.sort(key=lambda x: x[id_key], reverse=True)
+            
         return normalized_logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
